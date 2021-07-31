@@ -1,0 +1,34 @@
+------------------------------------------------------------------------------
+-- ▖▖▄▖▄▖
+-- ▌▌▄▌▛▌
+-- ▚▘▙▖█▌
+--
+-- @file      aide.copyrights
+-- @copyright See content below
+-- @licence   GPLv3
+-- @encoding  UTF-8
+------------------------------------------------------------------------------
+-- @summary
+-- aide library copyrights & credits summary 
+--
+-- @description
+-- 
+-- @authors
+-- Stéphane Rivière - sr - sriviere@soweb.io
+--
+-- @versions
+-- 20210321 - 0.1 - sr - initial release
+-- 20210324 - 0.2 - sr - reference to the v20 manual
+------------------------------------------------------------------------------
+
+* Detailed copyrights and credits
+
+Please refer to the document...
+
+sow - AIDE for Debian & Ubuntu Manual.*
+
+...located in ./doc subdirectory.
+
+------------------------------------------------------------------------------
+-- eof
+------------------------------------------------------------------------------

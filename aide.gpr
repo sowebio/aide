@@ -1,0 +1,210 @@
+------------------------------------------------------------------------------
+--  ▖▖▄▖▄▖
+--  ▌▌▄▌▛▌
+--  ▚▘▙▖█▌
+--
+--  @file      aide.gpr
+--  @copyright See authors list below and aide.copyrights file
+--  @licence   GPL v3
+--  @encoding  UTF-8
+------------------------------------------------------------------------------
+--  @summary
+--  aide library project file
+--
+--  @description
+--  Build application and documentation
+--
+--  @authors
+--  Stéphane Rivière - sr - sriviere@soweb.io
+--
+--  @versions
+--  20210317 - 0.1 - sr - initial release
+--  20210331 - 0.2 - sr - Add Style and GNATColl builds 
+------------------------------------------------------------------------------
+
+--  (0) invert comments for the 3 related lines to unlink gnatcoll sources
+--      in order to generate pertinent documentation and true metrics 
+
+--  with "gnatcoll"; --  (0)
+project aide is
+
+   --  for Languages use ("Ada"); --  (0)
+   for Languages use ("Ada", "C");
+
+   type aide_Build_Type is ("Style", "Debug", "Fast", "Small");
+
+   --  Add -Xaide_Build=Style in the GNATStudio build all window...
+   --  %builder -Xaide_Build=Style -d %eL -P%PP %config %autoconf %X
+   --  ...to directly control the build behaviour
+   
+   aide_Build : aide_Build_Type := external ("aide_Build", "Debug");
+
+   --  for Source_Dirs use ("src/**", "../v20/src/**"); --  (0)
+   for Source_Dirs use ("src/**", "../v20/src/**", "/home/sr/opt/gnat-2021/include/gnatcoll");
+   
+   case aide_Build is
+      when "Style" => 
+         for Object_Dir use "obj/style";
+      when "Debug" => 
+         for Object_Dir use "obj/debug";
+         --  Use runtime with debug capabilities
+         --for Runtime ("Ada") use "/home/sr/opt/gnat-2020/lib/gcc/x86_64-pc-linux-gnu/9.3.1/rts-native-debug";
+         for Runtime ("Ada") use "/home/sr/opt/gnat-2021/lib/gcc/x86_64-pc-linux-gnu/10.3.1/rts-native-debug";
+      when "Fast"  => 
+         for Object_Dir use "obj/fast";
+      when "Small" => 
+         for Object_Dir use "obj/small";
+   end case;
+   
+   for Exec_Dir use "bin";
+   for Create_Missing_Dirs use "True";
+   
+   for Main use ("aide.adb");
+   
+   Common_Compiler_Options := (
+    -- General 
+    "-gnatW8",           --  Both brackets and UTF-8 encodings will be recognized (1)
+    -- Warnings & Errors
+    "-gnatU",            --  Enable unique tag for error messages
+    "-gnatf",            --  Full errors. Verbose details, all undefined references
+    "-gnatq",            --  Don't quit, try semantics, even if parse errors
+    "-gnatQ",            --  Don't quit, write ali/tree file even if compile errors
+    "-gnatVaep",         --  Enable selected validity checking mode (2)   
+    "-gnatw.eDH.Y",      --  Enable selected warning modes (3)
+    -- "-Wall",          --  Enable most warning messages
+    -- Style
+    "-gnatyaefhkM160npr" --  Enable selected style checks (4)
+   );
+   
+   Style_Compiler_Options := (
+   "-gnatg"              --  RTS Style (6)
+   );
+   
+   Debug_Compiler_Options := (
+    "-gnata",            --  Assertions enabled
+    "-gnato",            --  Enable overflow checking in STRICT mode
+    "-gnateE",           --  Generate extra information in exception messages 
+    "-gnateF",           --  Check overflow on predefined Float types
+    "-gnatVa",           --  Enable all validity checking options
+    "-fstack-check",
+    "-fno-inline",
+    --
+    "-gnatec=" & project'Project_Dir & "aide.dbg",
+    "-g"                 --  Generate debugging information
+   );
+
+   Fast_Compiler_Options := (
+    "-O2",
+    "-gnatpn", 
+    "-fipa-cp-clone", "-fgcse-after-reload", 
+    "-funroll-loops", "-fpeel-loops", "-funswitch-loops", 
+    "-ftracer", "-fweb", "-ftree-vectorize",
+    "-frename-registers", "-ffunction-sections",
+    "-g"     
+   );
+
+   Small_Compiler_Options := (
+    "-Os"
+   );
+
+   --  (1)
+   --  https://gcc.gnu.org/onlinedocs/gcc-4.8.5/gnat_ugn_unw/Character-Set-Control.html
+   --  https://gcc.gnu.org/onlinedocs/gcc-4.8.5/gnat_ugn_unw/Wide-Character-Encodings.html#Wide-Character-Encodings
+   --  (2) 
+   --  a turn on all validity checking options
+   --  e turn on checking for elementary components
+   --  p turn on checking for parameters
+   --  (3)
+   --  .e turn on every optional info/warning (no exceptions)
+   --  D  turn off warnings for implicit dereference (default)
+   --  H  turn off warnings for hiding declarations (default)
+   --  .Y turn off info messages for why pkg body needed (default)
+   --  (4)
+   --  a  check attribute casing
+   --  e  check end/exit labels present
+   --  f  check no form feeds/vertical tabs in source
+   --  h  no horizontal tabs in source
+   --  k  check casing rules for keywords
+   --  Mn check line length <= n characters
+   --  n  check casing of package Standard identifiers
+   --  p  check pragma casing
+   --  r  check casing for identifier references
+   --  (5)
+   --  Options starting with -g, -f, -m, -O, -W, or --param are automatically passed on to the various sub-processes 
+   --  invoked by gcc.  In order to pass  other options on to these processes the -W<letter> options must be used.
+   --  (6) All warnings and style messages are treated as errors. -gnatg implies -gnatw.ge and -gnatyg so that all
+   --  standard warnings and all standard style options are turned on. All warnings and style messages are treated
+   --  as errors.'
+
+   --  gnatmake options
+   package Compiler is
+      case aide_Build is
+      when "Style"   => 
+         for Default_Switches ("ada") use Common_Compiler_Options & Style_Compiler_Options;
+      when "Debug" => 
+         for Default_Switches ("ada") use Common_Compiler_Options & Debug_Compiler_Options;
+         for Switches ("s-memory.adb") use ("-gnatg");    
+      when "Fast"  => 
+         for Default_Switches ("ada") use Common_Compiler_Options & Fast_Compiler_Options;
+         for Switches ("s-memory.adb") use ("-gnatg");      
+      when "Small" =>
+         for Default_Switches ("ada") use Common_Compiler_Options & Small_Compiler_Options;
+         for Switches ("s-memory.adb") use ("-gnatg");                  
+      end case;
+   end Compiler;
+   
+   Common_Binder_Options := ("-static");
+   
+   --  gnatbind options
+   package Binder is
+      case aide_Build is
+      when "Small" => for Default_Switches ("ada") use Common_Binder_Options;
+         --  -Es: Store tracebacks in exception occurrences, and enable symbolic tracebacks
+      when others  => for Default_Switches ("ada") use Common_Binder_Options & ("-Es");
+      end case;
+   end Binder;
+   
+   Common_Linker_Options := ("-static");
+   
+   --  ld options
+   package Linker is
+      -- Static link with external C libs
+      -- for Switches ("ada") use ("-L/home/sr/Seafile/Sowebio/informatique/dev/ada/lib/zlib-1211", "-lz");
+      case aide_Build is
+      when "Style" => 
+         for Default_Switches ("ada") use Common_Linker_Options;
+      when "Debug" => 
+         for Default_Switches ("ada") use Common_Linker_Options & ("-g");
+      when "Fast"  => 
+         for Default_Switches ("ada") use Common_Linker_Options & ("-g", "-Wl,--gc-sections");
+      when "Small" => 
+         for Default_Switches ("ada") use Common_Linker_Options & ("-Wl,--gc-sections");
+      end case;
+   end Linker;
+
+  --  gprbuild options
+   package Builder is
+      -- -d   Display compilation process
+      -- -j0  Use num processes to compile 0=all platform cores are used
+      -- -s   Recompile if compiler switches have changed
+      for Default_Switches ("ada") use ("-d", "-j0", "-s");
+   end Builder;
+  
+   -- gnatdoc options
+   package Documentation is -- gnatdoc options
+      for Documentation_Dir use "doc-generated";
+   end Documentation;
+  
+   --  gnatpp option
+   package Pretty_Printer is
+      for Default_Switches ("ada") use ("-M120", "-W8", "--comments-unchanged");
+   end Pretty_Printer;
+
+   --  gps options (to be reworked with appropriate options)
+   --  package Ide is
+   --   for Default_Switches ("adacontrol") use ("-f", "aide.aru", "-r");
+   --  end Ide;
+
+-------------------------------------------------------------------------------
+end aide;
+-------------------------------------------------------------------------------
