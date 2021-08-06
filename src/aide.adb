@@ -1,7 +1,7 @@
 ------------------------------------------------------------------------------
---  ▖▖▄▖▄▖
---  ▌▌▄▌▛▌
---  ▚▘▙▖█▌
+--  ▄▖▄▖▄ ▄▖
+--  ▌▌▐ ▌▌▙▖
+--  ▛▌▟▖▙▘▙▖
 --
 --  @file      aide.adb
 --  @copyright Sowebio SARL - France
@@ -65,6 +65,14 @@
 --  20210730 - 2.15 - sr - Finishes for production ready status. Fix many bugs.
 --                         Rework messages, parameters, options and 
 --                         documentation.
+--  20210804 - 2.16 - sr - Fix a RTE when a program is launched through a 
+--                         symbolic link. Add date build at the start banner.
+--                         Fix a RTE (due to missing MIME) if a station install
+--                         was done on a server target. This choice gives now
+--                         an error message: "Error: Can't install a station 
+--                         setup on a server target." Add a specific Linux 
+--                         linker option to the HAC build line to handle full
+--                         static build.
 -------------------------------------------------------------------------------
 
 with GNAT.Command_Line;
@@ -185,7 +193,7 @@ begin
 
    --  Main settings
 
-   Prg.Set_Version (2, 15);
+   Prg.Set_Version (2, 16);
    Log.Set_Debug (False);
 
    --  Memory monitor
@@ -197,8 +205,9 @@ begin
    --  Header
 
    Log.Line;
-   Log.Msg ("AIDE - Ada Instant Development Environment - " & Prg.Get_Version);
+   Log.Msg ("AIDE - Ada Instant Development Environment");
    Log.Msg ("Copyright (C) Sowebio SARL 2020-2021, according to GPLv3.");
+   Log.Msg (Prg.Get_Version & " - " & v20.Get_Version & " - " & v20.Get_Build);
    Log.Line;
    
    --  Files to download 
@@ -360,6 +369,13 @@ begin
       if Gcl_Check then   ----------------------------------------------/\-----
          Raise_Exception; --  < Crash program to test .err trace       /!!\
       end if;             --------------------------------------------/-!!-\---
+
+      -- Check graphic station or text mode server (to avoid MIME RTE)
+      if (not Fls.Exists (+"/usr/share/xsessions")) and (GNAT_Target = +"station") then
+         Log.Msg (+"Error: Can't install a station setup on a server target.");
+         Log.Line;
+         Arg_Not_Valid := True;
+      end if;
 
       GNAT_Dir_Dl := GNAT_Dir & "-downloads";
 

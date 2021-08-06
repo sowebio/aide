@@ -1,7 +1,7 @@
 ------------------------------------------------------------------------------
---  ▖▖▄▖▄▖
---  ▌▌▄▌▛▌
---  ▚▘▙▖█▌
+--  ▄▖▄▖▄ ▄▖
+--  ▌▌▐ ▌▌▙▖
+--  ▛▌▟▖▙▘▙▖
 --
 --  @file      aide-srv.adb
 --  @copyright Sowebio SARL - France
@@ -18,7 +18,7 @@
 --  Stéphane Rivière - sr - sriviere@soweb.io
 --
 --  @versions
---  see aides.ads
+--  see aide.adb
 ------------------------------------------------------------------------------
 
 separate (Aide) package body Srv is
@@ -1142,7 +1142,7 @@ begin
             Log.Msg (+"HAC installation.");
             
             if Fls.Set_Directory (GNAT_Dir_Dl & "/hac") then
-               Sys.Shell_Execute ("gprbuild -d -P./hac.gpr");
+               Sys.Shell_Execute ("gprbuild -d -P./hac.gpr -XHAC_OS=Linux");
                Fls.Copy_File (GNAT_Dir_Dl & "/hac/hac", GNAT_Dir & "/bin/hac");
                Sys.Shell_Execute ("chmod +x " & GNAT_Dir & "/bin/hac");
                if Fls.Create_Directory_Tree (GNAT_Dir & "/share/doc/hac") then
