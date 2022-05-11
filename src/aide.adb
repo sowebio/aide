@@ -73,6 +73,23 @@
 --                         setup on a server target." Add a specific Linux 
 --                         linker option to the HAC build line to handle full
 --                         static build.
+--  20220510 - 2.17 - sr - Now delete uncomplete installation. Regression fix
+--                         when installing 2019 or 2020 GNAT CE year. Enhance
+--                         package detection reliability. Fix compatibility
+--                         with new v20 releases. Fix Curl HTTP/2 error with 
+--                         old Nginx relese by moving the download web server
+--                         to another one with a recent Nginx. Quick fixed
+--                         (by lack of time and interest on this subject 
+--                         regarding an old CE 2019 release) an inexplicable
+--                         (at first examination) regression about building
+--                         RTS with debug by... invalidating it. Remove the 
+--                         download of external libraries because this is 
+--                         outside the scope of AIDE. Add Gpb (Gprbuild stub)
+--                         utility, see AIDE manual for using it. Remove 
+--                         alternate Adacore package download when installing 
+--                         as we need some extra files in station packages. 
+--                         Also simplify options set.
+--
 -------------------------------------------------------------------------------
 
 with GNAT.Command_Line;
@@ -119,7 +136,7 @@ procedure Aide is
       Station_Size : Natural;
    end record;
    
-   AIDE_Root_Url_Download_Packs : constant String := "https://stef.genesix.org/pub/ada/aide/";
+   AIDE_Root_Url_Download_Packs : constant String := " https://www.sowebio.com/wp-content/uploads/aide/";
    AIDE_Install_Ok_File : constant String := "install_ok_dont_delete_this_file";
 
    GNAT_Download : array (2019 .. 2021) of GNAT_To_Download;
@@ -164,7 +181,7 @@ procedure Aide is
       --  Install GNAT pack
       function Install_GNAT (Year_Install : VString) return Boolean;
       --  Install GNAT community edition.
-   procedure Create_GNAT_Pack_Files (File_Install : VString;
+      procedure Create_GNAT_Pack_Files (File_Install : VString;
                                      Year_Install : VString;
                                      Dir_Install : VString;
                                      Type_Install : VString;
@@ -191,22 +208,24 @@ procedure Aide is
 
 begin
 
-   --  Main settings
-
-   Prg.Set_Version (2, 16);
-   Log.Set_Debug (False);
-
    --  Memory monitor
 
    Sys.Set_Memory_Monitor (True);
    Log.Dbg (Sys.Get_Alloc_Ada);
    Log.Dbg (sys.Get_Alloc_All);
 
+   --  Main settings
+
+   Prg.Set_Version (2, 17);
+   Log.Set_Display(True);
+   Log.Set_Debug (False);
+   Tio.Cursor_Off;
+
    --  Header
 
    Log.Line;
    Log.Msg ("AIDE - Ada Instant Development Environment");
-   Log.Msg ("Copyright (C) Sowebio SARL 2020-2021, according to GPLv3.");
+   Log.Msg ("Copyright (C) Sowebio SARL 2020-2022, according to GPLv3.");
    Log.Msg (Prg.Get_Version & " - " & v20.Get_Version & " - " & v20.Get_Build);
    Log.Line;
    
@@ -214,14 +233,14 @@ begin
    --  No integrity check as install or decompress check already exists
 
    --  2019
-   GNAT_Download(2019).Name := +"gnat-2019-20190517-linux64";    
+   GNAT_Download(2019).Name := +"gnat-2019-20190517-linux64";
    
    GNAT_Download(2019).Install_Url := +"https://community.download.adacore.com/v1/" & 
                        "0cd3e2a668332613b522d9612ffa27ef3eb0815b?filename=" &
                        "gnat-community-2019-20190517-x86_64-linux-bin";
    GNAT_Download(2019).Install_Size := 516626663;
    GNAT_Download(2019).Server_Size := 179628304;
-   GNAT_Download(2019).Station_Size := 453426880;
+   GNAT_Download(2019).Station_Size := 554126668;
    
    --  2020
    GNAT_Download(2020).Name := +"gnat-2020-20200429-linux64";
@@ -231,7 +250,7 @@ begin
                        "gnat-2020-20200429-x86_64-linux-bin";
    GNAT_Download(2020).Install_Size := 661178129;       
    GNAT_Download(2020).Server_Size := 190787452;
-   GNAT_Download(2020).Station_Size := 563875324;
+   GNAT_Download(2020).Station_Size := 699872000;
 
    --  2021 
    GNAT_Download(2021).Name := +"gnat-2021-20210519-linux64";  
@@ -241,16 +260,16 @@ begin
                        "gnat-2021-20210519-x86_64-linux-bin";
    GNAT_Download(2021).Install_Size := 754890671;       
    GNAT_Download(2021).Server_Size := 202068476;
-   GNAT_Download(2021).Station_Size := 636251504;
+   GNAT_Download(2021).Station_Size := 793303568;
 
    --  Command line processing ------------------------------------------------
 
       declare
 
       Gcl_Target : aliased GS.String_Access;
-      Gcl_Install : aliased GS.String_Access;
+      --  Gcl_Install : aliased GS.String_Access;
       Gcl_Year : aliased Integer := 0;
-      Gcl_Check : aliased Boolean := False;
+      --  Gcl_Check : aliased Boolean := False;
       
       Arg_Count : Natural := 0;
       Arg_Last, Arg_Not_Valid : Boolean := False;
@@ -281,19 +300,19 @@ begin
                          Long_Switch => "--target=",
                          Argument => "TARGET",
                          Help => "server|[station] with graphic IDE");
-      GCL.Define_Switch (Config, Gcl_Install'Access,
-                         Switch => "-i=",
-                         Long_Switch => "--install=",
-                         Argument => "DIRECTORY",
-              Help => "[~/opt/gnat-YEAR] or home based custom sub-directory");
+      --  GCL.Define_Switch (Config, Gcl_Install'Access,
+      --                     Switch => "-i=",
+      --                     Long_Switch => "--install=",
+      --                     Argument => "DIRECTORY",
+      --          Help => "[~/opt/gnat-YEAR] or home based custom sub-directory");
       GCL.Define_Switch (Config, Gcl_Year'Access,
                          Switch => "-y=",
                          Long_Switch => "--year=",
                          Argument => "YEAR",
                          Help => "2019|2020|[2021] GNAT CE Year edition");
-      GCL.Define_Switch (Config, Gcl_Check'Access,
-                         Switch => "-c",
-                         Help => "Check .err trace raising an exception");
+      --  GCL.Define_Switch (Config, Gcl_Check'Access,
+      --                     Switch => "-c",
+      --                     Help => "Check .err trace raising an exception");
 
       --  Command line loading
 
@@ -345,7 +364,7 @@ begin
          Arg_Not_Valid := True;
       end if;
       Log.Dbg ("Switch -t: " & GNAT_Target);
-
+ 
       if Gcl_Year = 0 then
          GNAT_Year := +"2021";
       elsif Gcl_Year = 2019 or
@@ -358,17 +377,17 @@ begin
       end if;
       Log.Dbg ("Switch -y: " & GNAT_Year);
 
-      if Gcl_Install.all = "" then
+      --  if Gcl_Install.all = "" then
          GNAT_Dir := Sys.Get_Home & GNAT_Dir_Root & GNAT_Year;
-      else
-         GNAT_Dir :=
-            Sys.Get_Home & "/" & Trim_Slashes (To_VString (Gcl_Install.all));
-      end if;
+      --  else
+      --     GNAT_Dir :=
+      --        Sys.Get_Home & "/" & Trim_Slashes (To_VString (Gcl_Install.all));
+      --  end if;
       Log.Dbg ("Switch -i: " & GNAT_Dir);
       
-      if Gcl_Check then   ----------------------------------------------/\-----
-         Raise_Exception; --  < Crash program to test .err trace       /!!\
-      end if;             --------------------------------------------/-!!-\---
+      --  if Gcl_Check then   ----------------------------------------------/\-----
+      --     Raise_Exception; --  < Crash program to test .err trace       /!!\
+      --  end if;             --------------------------------------------/-!!-\---
 
       -- Check graphic station or text mode server (to avoid MIME RTE)
       if (not Fls.Exists (+"/usr/share/xsessions")) and (GNAT_Target = +"station") then
@@ -476,15 +495,15 @@ begin
    elsif AIDE_Action = Remove_Action then
       Log.Set_Task ("REMOVE");
 
-      if Fls.Exists (GNAT_Dir & "/" & AIDE_Install_Ok_File) then
+      --if Fls.Exists (GNAT_Dir & "/" & AIDE_Install_Ok_File) then
          Srv.Remove_GNAT;
          Srv.Remove_Registering (GNAT_Year);
          Fls.Delete_Lines (Sys.Get_Home & "/.bashrc", To_String
                    (Sys.Get_Home & GNAT_Dir_Root & GNAT_Year & "/bin:$PATH"));
          Srv.Help_Block_2;
-      else
-         Log.Msg ("GNAT CE " & GNAT_Year & " is not installed.");
-      end if;
+      --else
+      --   Log.Msg ("GNAT CE " & GNAT_Year & " is not installed.");
+      --end if;
 
    elsif AIDE_Action = List_Action then
       Log.Set_Task ("LIST");
@@ -540,23 +559,29 @@ begin
    Log.Title ("");
    Log.Set_Disk (False);
    Log.Line;
+   
+   Log.Set_Debug (False);
+   Tio.Cursor_On;
 
 exception
 
    --  -h or --help switches
    when GCL.Exit_From_Command_Line =>
       Srv.Help_Block_1;
+      Tio.Cursor_On;
       GOL.OS_Exit (1);
 
    --  Invalid switches
    when GCL.Invalid_Switch =>
       Srv.Help_Block_1;
+      Tio.Cursor_On;
       GOL.OS_Exit (2);
 
    --  Invalid switches
    when GCL.Invalid_Parameter =>
       GCL.Display_Help (Config);
       Srv.Help_Block_1;
+      Tio.Cursor_On;
       GOL.OS_Exit (3);
 
    --  Runtime errors

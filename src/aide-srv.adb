@@ -366,10 +366,10 @@ separate (Aide) package body Srv is
    function Install_GNAT_Path (Dir_Install : VString) return Boolean is
       Bashrc_File : constant VString := Sys.Get_Home & "/.bashrc";
       Bashrc_Handle : Tio.File;
-      Bashrc_Buffer : VString := +"";
-      Bashrc_Path_Unset : Boolean := True;
+      --Bashrc_Buffer : VString := +"";
+      --Bashrc_Path_Unset : Boolean := True;
       Env_Path_Set : Boolean := False;
-      LF : constant VString := To_VString (Character'Val (10));
+      --LF : constant VString := To_VString (Character'Val (10));
    begin
 
       if not Fls.Exists (Dir_Install) then
@@ -384,19 +384,24 @@ separate (Aide) package body Srv is
 
          Tio.Open_Read (Bashrc_Handle, Bashrc_File);
          if Tio.Is_Open (Bashrc_Handle) then
-            --  Search permanent PATH
-            while not (Tio.End_Of_File (Bashrc_Handle)) loop
-               Tio.Get_Line (Bashrc_Handle, Bashrc_Buffer);
-               if Index (Bashrc_Buffer, Dir_Install & "/bin:$PATH") > 0 then
-                  Bashrc_Path_Unset := False;
-                  Log.Msg ("GNAT path already exists in " & Bashrc_File);
-               end if;
-            end loop;
+            --  --  Search permanent PATH
+            --  while not (Tio.End_Of_File (Bashrc_Handle)) loop
+            --     Tio.Get_Line (Bashrc_Handle, Bashrc_Buffer);
+            --     if Index (Bashrc_Buffer, Dir_Install & "/bin:$PATH") > 0 then
+            --        Bashrc_Path_Unset := False;
+            --        Log.Msg ("GNAT path already exists in " & Bashrc_File);
+            --     end if;
+            --  end loop;
 
             Tio.Close (Bashrc_Handle);
+            
+            --  Delete all previous PATH
+            for I in 2019 .. 2021 loop
+               Fls.Delete_Lines (Bashrc_File, To_String (Sys.Get_Home & GNAT_Dir_Root & To_VString (I) & "/bin:$PATH"));
+            end loop;
 
             --  Set new permanent PATH
-            if Bashrc_Path_Unset then
+            --if Bashrc_Path_Unset then
                Tio.Append (Bashrc_Handle, Bashrc_File);
                if Tio.Is_Open (Bashrc_Handle) then
                   -- A first LF is mandatory to circumvent the vicious case of
@@ -412,7 +417,7 @@ separate (Aide) package body Srv is
                else
                   Log.Err ("Srv.Install_GNAT_Path - Can't append " & Bashrc_File);
                end if;
-            end if;
+            --end if;
 
             --  Exit for current session when no PATH still set
             if Index (Sys.Get_Env ("PATH"), Dir_Install) = 0 then
@@ -450,6 +455,14 @@ separate (Aide) package body Srv is
 
       if Year_Install = "2019" then
          GNAT_RTS_Version := +"8.3.1";
+         return True;
+         -- Non understandable regression building GNAT debug RTS for CE 2019. By
+         -- lack of time and interest, fix this with a wild return to continue
+         -- the installation.
+         -- /home/sr/opt/gnat-2019/lib/gcc/x86_64-pc-linux-gnu/8.3.1/adainclude/init.c
+         -- :583:18: error: missing binary operator before token "("
+         -- # if 16 * 1024 < MINSIGSTKSZ
+         --                  ^~~~~~~~~~~
       elsif Year_Install = "2020" then
          GNAT_RTS_Version := +"9.3.1";
       elsif Year_Install = "2021" then
@@ -462,29 +475,29 @@ separate (Aide) package body Srv is
         GNAT_RTS_Version & "/rts-native-debug/adalib";
     
       -- Patch Makefile.adalib need for CE 2021
-      if Year_Install = "2021" then    
-         if Fls.Exists (GNAT_RTS & "/Makefile.adalib") then
-            if Fls.Search_Lines (GNAT_RTS & "/Makefile.adalib", "tb-gcc.c") then
-               Log.Msg ("Need to patch: " & GNAT_RTS & "/Makefile.adalib");
-               
-               -- tb-gcc.c no longer exists in CE 2021 but reusing CE 2020 makefile.adalib
-               Sys.Shell_Execute ("sed 's/tb-gcc.c//g' " & GNAT_RTS & "/Makefile.adalib" & " > " & GNAT_RTS & "/Makefile.tmp", Exec_Error);
-               
-               if (Exec_Error = 0) then
-                  Sys.Shell_Execute ("mv -f " & GNAT_RTS & "/Makefile.tmp " & GNAT_RTS & "/Makefile.adalib", Exec_Error);
-                  if (Exec_Error = 0) then
-                     Log.Msg ("Successfully patching: " & GNAT_RTS & "/Makefile.adalib");
-                  else
-                     Log.Err ("mv -f " & GNAT_RTS & "/Makefile.tmp " & GNAT_RTS & "/Makefile.adalib");
-                     Log.Err ("Srv.Install_GNAT_Debug_RTS - Error writing Makefile.adalib, error: " & To_VString(Exec_Error));
-                  end if;
-               else
-                  Log.Err ("mv -f " & GNAT_RTS & "/Makefile.tmp " & GNAT_RTS & "/Makefile.adalib");
-                  Log.Err ("Srv.Install_GNAT_Debug_RTS - Error patching Makefile.adalib, error: " & To_VString(Exec_Error));
-               end if;
-            end if;
-         end if;
-      end if;
+      --  if Year_Install = "2021" then
+      --     if Fls.Exists (GNAT_RTS & "/Makefile.adalib") then
+      --        if Fls.Search_Lines (GNAT_RTS & "/Makefile.adalib", "tb-gcc.c") then
+      --           Log.Msg ("Need to patch: " & GNAT_RTS & "/Makefile.adalib");
+      --  
+      --           -- tb-gcc.c no longer exists in CE 2021 but reusing CE 2020 makefile.adalib
+      --           Sys.Shell_Execute ("sed 's/tb-gcc.c//g' " & GNAT_RTS & "/Makefile.adalib" & " > " & GNAT_RTS & "/Makefile.tmp", Exec_Error);
+      --  
+      --           if (Exec_Error = 0) then
+      --              Sys.Shell_Execute ("mv -f " & GNAT_RTS & "/Makefile.tmp " & GNAT_RTS & "/Makefile.adalib", Exec_Error);
+      --              if (Exec_Error = 0) then
+      --                 Log.Msg ("Successfully patching: " & GNAT_RTS & "/Makefile.adalib");
+      --              else
+      --                 Log.Err ("mv -f " & GNAT_RTS & "/Makefile.tmp " & GNAT_RTS & "/Makefile.adalib");
+      --                 Log.Err ("Srv.Install_GNAT_Debug_RTS - Error writing Makefile.adalib, error: " & To_VString(Exec_Error));
+      --              end if;
+      --           else
+      --              Log.Err ("mv -f " & GNAT_RTS & "/Makefile.tmp " & GNAT_RTS & "/Makefile.adalib");
+      --              Log.Err ("Srv.Install_GNAT_Debug_RTS - Error patching Makefile.adalib, error: " & To_VString(Exec_Error));
+      --           end if;
+      --        end if;
+      --     end if;
+      --  end if;
       
       if Fls.Create_Directory_Tree (GNAT_RTS_Debug) then
          Fls.Copy_File (GNAT_RTS & "/Makefile.adalib", 
@@ -550,36 +563,33 @@ separate (Aide) package body Srv is
    
    ----------------------------------------------------------------------------   
    function Install_GNAT (Year_Install : VString) return Boolean is
+   
       GNAT_Dir_Pack : constant VString := Sys.Get_Home & GNAT_Dir_Root & Year_Install & "-packages";
-      --GNAT_Dir_Pack_Station : constant VString := GNAT_Dir_Pack & "/station";       
-      --GNAT_Dir_Pack_Server : constant VString := GNAT_Dir_Pack & "/server"; 
    
-      Script_Name : constant VString := +"install_script.qs";
-      Build_String : VString := " --script ./" & Script_Name &
-                                " --platform minimal --verbose" &
-                                " InstallPrefix=" & GNAT_Dir;
+      --  Script_Name : constant VString := +"install_script.qs";
    
-      --GNAT_File, GNAT_Url, GNAT_Sha1 : VString := +"";
+      --  Build_String : VString := " --script ./" & Script_Name &
+      --                            " --platform minimal --verbose" &
+      --                            " InstallPrefix=" & GNAT_Dir;
+   
+      GNAT_Handle : Tio.File;
       GNAT_Size : Integer := 0;
-      Exec_Error : Integer;
-      Gnat_Dir_Clean : Boolean := True;
+      --  Exec_Error : Integer;
+      --  Gnat_Dir_Clean : Boolean := True;
       
       Gnat_Installed : Boolean := False;
       Result : Boolean := False;
       
-      GNAT_Year : constant Natural := To_Integer(Year_Install);
-      GNAT_Pack_Org : constant VString := GNAT_Dir_Pack & "/" & 
-                                          GNAT_Download(GNAT_Year).Name & "-" & 
-                                          GNAT_Target & ".tar.xz";
+      Year_Install_Index : constant Natural := To_Integer(Year_Install);
 
+      GNAT_Pack_Org : constant VString := GNAT_Dir_Pack & "/" &
+                                          GNAT_Download(Year_Install_Index).Name & "-" &
+                                          GNAT_Target & ".tar.xz";
       GNAT_Pack_Dest : constant VString := GNAT_Dir & "/" & 
-                                          GNAT_Download(GNAT_Year).Name & "-" & 
-                                          GNAT_Target & ".tar";                                     
-                                           
-    --GNAT_File_Aide : constant VString := GNAT_Dir_Pack & "/" & GNAT_Download(GNAT_Year).Name;
-      GNAT_File : constant VString := GNAT_Dir_Dl & "/gnat-" & GNAT_Year & "-install";
-      
-      GNAT_Handle : Tio.File;
+                                          GNAT_Download(Year_Install_Index).Name & "-" & 
+                                          GNAT_Target & ".tar"; 
+
+      --  GNAT_File : constant VString := GNAT_Dir_Dl & "/gnat-" & Year_Install & "-install";
       
 begin 
       --  If GNAT not already successfully installed
@@ -591,6 +601,7 @@ begin
          end if;
          
          if not Fls.Exists (GNAT_Dir) then
+         
             --  Attempt to get AIDE local package
             if Fls.Exists (GNAT_Pack_Org) then
                Log.Msg("Try to install GNAT from AIDE local package repository.");
@@ -610,95 +621,95 @@ begin
                Log.Msg("Try to install GNAT from AIDE distant package repository.");
                
                if GNAT_Target = "server" then      
-                  GNAT_Size := GNAT_Download(GNAT_Year).Server_Size;
+                  GNAT_Size := GNAT_Download(Year_Install_Index).Server_Size;
                elsif GNAT_Target = "station" then
-                  GNAT_Size := GNAT_Download(GNAT_Year).Station_Size;
+                  GNAT_Size := GNAT_Download(Year_Install_Index).Station_Size;
                end if;
                --  Create install directory
                if Fls.Create_Directory_Tree (GNAT_Dir) then
-                  
-                  if Fls.Download_File (AIDE_Root_Url_Download_Packs & GNAT_Download(2021).Name & "-" & GNAT_Target & ".tar.xz", 
+               
+                  if Fls.Download_File (AIDE_Root_Url_Download_Packs & 
+                                        GNAT_Download(Year_Install_Index).Name & 
+                                        "-" & GNAT_Target & ".tar.xz", 
                                         GNAT_Pack_Dest & ".xz", 
                                         +"", 
                                         GNAT_Size) then
                                         
                      Gnat_Installed := Install_GNAT_Pack (GNAT_Pack_Dest);
-                     
+        
                   end if;
                end if;
             end if;
-            
- --   tio.pause;
             
             --  Attempt to get AdaCore distant package
-            if not Gnat_Installed then
-               Log.Msg("Try to install GNAT from AdaCode repository.");
-               
-               if Fls.Download_File (GNAT_Download(GNAT_Year).Install_Url, 
-                                     GNAT_File, +"GNAT", 
-                                     GNAT_Download(GNAT_Year).Install_Size) then
-                  
-                  Log.Msg ("GNAT installation from installer: " & GNAT_File);
-                  
-                  --  Generate install_script.qs 
-                  if Install_GNAT_Script (Gnat_Dir_Dl & "/" & Script_Name) then 
-                     
-                     Sys.Shell_Execute (+"chmod +x " & GNAT_File, Exec_Error);
-                     
-                     --  GNAT, GPS and all related GNU tools
-                     
-                     --  Components is an optional argument which specifies a list 
-                     --  of components to install. The list is comma-separated 
-                     --  without spaces. Without this argument, the entire package
-                     --  is installed. Components available are : com.adacore.gnat 
-                     --  com.adacore.libadalang com.adacore.spark2014_discovery and
-                     --  com.adacore.gnatstudio.
-                     
-                     --  If server, limit to GNAT core (compiler only)
-                     if GNAT_Target = "server" then
-                        Build_String := GNAT_File & Build_String & 
-                          " Components=com.adacore.gnat";
-                     elsif GNAT_Target = "station" then
-                        Build_String := GNAT_File & Build_String;
-                     end if;
-                     
-                     if Fls.Set_Directory (GNAT_Dir_Dl) then
-                        Log.Msg ("Change to GNAT installation directory.");
-                        
-                        --  Wipe partial previous install
-                        if Fls.Exists (GNAT_Dir) then
-                           if Fls.Delete_Directory_Tree (GNAT_Dir) then
-                              Log.Msg ("Previous partial GNAT install detected and deleted.");
-                           else
-                              Gnat_Dir_Clean := False;
-                              Log.Err ("Srv.Install_GNAT - Can't delete previous partial GNAT install.");
-                           end if;
-                        end if;
-                        
-                        if Gnat_Dir_Clean then
-                           Sys.Shell_Execute (Build_String, Exec_Error);
-                           if Fls.Exists (Gnat_Dir_Dl & "/" & Script_Name) then
-                              Log.Msg (+"Delete GNAT installation script.");
-                              Fls.Delete_File (Gnat_Dir_Dl & "/" & Script_Name);
-                           end if;
-                           if (Exec_Error = 0) then
-                              Gnat_Installed := True;
-                           else
-                              Log.Err ("Srv.Install_GNAT - GNAT installer failed.");
-                           end if;
-                        end if;
-                     else
-                        Log.Err ("Srv.Install_GNAT - Can't change to installation directory.");
-                     end if;        
-                  else
-                     Log.Err ("Srv.Install_GNAT - GNAT installation script not generated.");
-                  end if;
-               else
-                  Log.Err ("Srv.Install_GNAT - GNAT install file not found");
-               end if;
-            end if;
+            --  if not Gnat_Installed then
+            --     Log.Msg("Try to install GNAT from AdaCode repository.");
+            --  
+            --     if Fls.Download_File (GNAT_Download(Year_Install_Index).Install_Url,
+            --                           GNAT_File, +"GNAT",
+            --                           GNAT_Download(Year_Install_Index).Install_Size) then
+            --  
+            --        Log.Msg ("GNAT installation from installer: " & GNAT_File);
+            --  
+            --        --  Generate install_script.qs
+            --        if Install_GNAT_Script (Gnat_Dir_Dl & "/" & Script_Name) then
+            --  
+            --           Sys.Shell_Execute (+"chmod +x " & GNAT_File, Exec_Error);
+            --  
+            --           --  GNAT, GPS and all related GNU tools
+            --  
+            --           --  Components is an optional argument which specifies a list
+            --           --  of components to install. The list is comma-separated
+            --           --  without spaces. Without this argument, the entire package
+            --           --  is installed. Components available are : com.adacore.gnat
+            --           --  com.adacore.libadalang com.adacore.spark2014_discovery and
+            --           --  com.adacore.gnatstudio.
+            --  
+            --           --  If server, limit to GNAT core (compiler only)
+            --           if GNAT_Target = "server" then
+            --              Build_String := GNAT_File & Build_String &
+            --                " Components=com.adacore.gnat";
+            --           elsif GNAT_Target = "station" then
+            --              Build_String := GNAT_File & Build_String;
+            --           end if;
+            --  
+            --           if Fls.Set_Directory (GNAT_Dir_Dl) then
+            --              Log.Msg ("Change to GNAT installation directory.");
+            --  
+            --              --  Wipe partial previous install
+            --              if Fls.Exists (GNAT_Dir) then
+            --                 if Fls.Delete_Directory_Tree (GNAT_Dir) then
+            --                    Log.Msg ("Previous partial GNAT install detected and deleted.");
+            --                 else
+            --                    Gnat_Dir_Clean := False;
+            --                    Log.Err ("Srv.Install_GNAT - Can't delete previous partial GNAT install.");
+            --                 end if;
+            --              end if;
+            --  
+            --              if Gnat_Dir_Clean then
+            --                 Sys.Shell_Execute (Build_String, Exec_Error);
+            --                 if Fls.Exists (Gnat_Dir_Dl & "/" & Script_Name) then
+            --                    Log.Msg (+"Delete GNAT installation script.");
+            --                    Fls.Delete_File (Gnat_Dir_Dl & "/" & Script_Name);
+            --                 end if;
+            --                 if (Exec_Error = 0) then
+            --                    Gnat_Installed := True;
+            --                 else
+            --                    Log.Err ("Srv.Install_GNAT - GNAT installer failed.");
+            --                 end if;
+            --              end if;
+            --           else
+            --              Log.Err ("Srv.Install_GNAT - Can't change to installation directory.");
+            --           end if;
+            --        else
+            --           Log.Err ("Srv.Install_GNAT - GNAT installation script not generated.");
+            --        end if;
+            --     else
+            --        Log.Err ("Srv.Install_GNAT - GNAT install file not found");
+            --     end if;
+            --  end if;
             
-            --  GNAT finalization
+            -- GNAT finalization
             if Gnat_Installed then
                Log.Msg ("GNAT install done.");
                if (GNAT_Target = "server") then
@@ -706,7 +717,7 @@ begin
                else
                   if Install_GNAT_Debug_RTS (Year_Install) then
                      Log.Msg ("GNAT debug ready RTS done.");
-                     
+            
                      Tio.Create (GNAT_Handle, GNAT_Dir & "/" & AIDE_Install_Ok_File);
                      Tio.Close (GNAT_Handle);
                      if Fls.Exists (GNAT_Dir & "/" & AIDE_Install_Ok_File) then
@@ -827,8 +838,8 @@ begin
                                      " --platform minimal --verbose" &
                                      " InstallPrefix=" & GNAT_Dir_Pack;
                                       
-      GNAT_Year : constant Natural := To_Integer(Year_Install);
-      GNAT_File : constant VString := GNAT_Dir_Pack & "/" & GNAT_Download(GNAT_Year).Name;
+      Year_Install_Index : constant Natural := To_Integer(Year_Install);
+      GNAT_File : constant VString := GNAT_Dir_Pack & "/" & GNAT_Download(Year_Install_Index).Name;
 
       Download_Needed : Boolean := True;
       Result : Boolean := True;    
@@ -838,7 +849,7 @@ begin
       Log.Msg ("Processing GNAT-" & Year_Install & " for packing.");    
          
       if Fls.Exists (GNAT_File) then
-         if Fls.File_Size (GNAT_File) = GNAT_Download (GNAT_Year).Install_Size then
+         if Fls.File_Size (GNAT_File) = GNAT_Download (Year_Install_Index).Install_Size then
             Download_Needed := False;
             Log.Msg (GNAT_File & " already downloaded");
          end if;
@@ -860,10 +871,10 @@ begin
          
          -- Download file
          if Result then
-            if Fls.Download_File (GNAT_Download(GNAT_Year).Install_Url, 
+            if Fls.Download_File (GNAT_Download(Year_Install_Index).Install_Url, 
                                   GNAT_File,
                                   "GNAT-" & Year_Install, 
-                                  GNAT_Download(GNAT_Year).Install_Size) then
+                                  GNAT_Download(Year_Install_Index).Install_Size) then
                Log.Msg (GNAT_File & " downloaded successfully");     
             else
                Result := False;
@@ -874,7 +885,6 @@ begin
 
       --  Installation
       if Result then
-      
          --  Set install file executable
          Sys.Shell_Execute (+"chmod +x " & GNAT_File, Exec_Error);
          if (Exec_Error = 0) then
@@ -948,10 +958,9 @@ begin
    procedure Install_Libraries (Year_Install : VString) is
       pragma Style_Checks (Off); -- Can't strip columns
       
-      GNAT_AWS_Url, GNAT_AWS_File, GaillyAdler_Zlib_Url, 
-      GaillyAdler_Zlib_File, GNAT_ASIS_Url, GNAT_ASIS_File, 
-      Adalog_Adacontrol_Url, Adalog_Adacontrol_File, StCarrez_Adautil_Url, 
-      GdMontmollin_HAC_Url : VString;
+      -- GaillyAdler_Zlib_Url, GaillyAdler_Zlib_File, StCarrez_Adautil_Url, 
+      GNAT_AWS_Url, GNAT_AWS_File, GNAT_ASIS_Url, GNAT_ASIS_File, 
+      Adalog_Adacontrol_Url, Adalog_Adacontrol_File, GdMontmollin_HAC_Url : VString;
       Lib_Size : Integer := 0;
       
       STD_OUT_REDIRECT : constant VString := +" 1>/dev/null ";
@@ -1014,64 +1023,64 @@ begin
 
       --  Libraries and packages ----------------------------------------------
       
-      --  Ada-Util
-      
-      if not Fls.Exists (GNAT_Dir & "/lib/utilada_core.static/libutilada_core.a") then
-         StCarrez_Adautil_Url := +"https://github.com/stcarrez/ada-util";
-         if Fls.Set_Directory (GNAT_Dir_Dl) then
-         
-            Log.Msg (+"Download Utilada.");
-            Sys.Shell_Execute ("git clone " & StCarrez_Adautil_Url);
-            Log.Msg (+"Utilada installation.");
-            
-            Fls.Rename (GNAT_Dir_Dl & "/ada-util", GNAT_Dir_Dl & "/utilada");
-            if Fls.Set_Directory (GNAT_Dir_Dl & "/utilada") then
-               --  ./configure --enable-aunit --disable-ahven --prefix=/home/sr/opt/gnat-2020
-               --  make install prefix=/home/sr/opt/gnat-2020
-               Sys.Shell_Execute (+"./configure " &
-                                  "--enable-aunit --disable-ahven " & -- mutually exclusive
-                                  "--prefix=" & GNAT_Dir);
-               Sys.Shell_Execute ("make");
-               --  Shell_Execute ("make test");
-               Sys.Shell_Execute ("make install");
-               if Fls.Create_Directory_Tree (GNAT_Dir & "/share/doc/utilada") then
-                  Fls.Copy_File (GNAT_Dir_Dl & "/utilada/docs/utilada-book.pdf", GNAT_Dir & "/share/doc/utilada/utilada.pdf");
-               end if;
-            end if;
-         end if;
-      else  
-         Log.Msg (+"Utilada already installed.");
-      end if;
-
-      --  Zlib build - https://github.com/madler/zlib -------------------------
-      --  Embedding use in ./lib/aws.*, but no external libz.a usuable
-
-      if not Fls.Exists (GNAT_Dir & "/lib/libz.a") then
-         GaillyAdler_Zlib_Url := +"https://zlib.net/zlib-1.2.11.tar.gz";
-         -- GCC linker -L parameter don't accept dots in path
-         GaillyAdler_Zlib_File := GNAT_Dir_Dl & "/zlib-1-2-11.tar.gz";
-
-         --  Download message is outputted in Fls.Download_File
-         if Fls.Download_File (GaillyAdler_Zlib_Url, GaillyAdler_Zlib_File, +"Zlib", 607698) then
-            Log.Msg (+"Zlib installation.");
-            
-            if Fls.Create_Directory_Tree (GNAT_Dir_Dl & "/zlib") then
-               Sys.Shell_Execute ("tar xzf " & GaillyAdler_Zlib_File & " --strip-components=1 -C " & GNAT_Dir_Dl & "/zlib");   
-               if Fls.Set_Directory (GNAT_Dir_Dl & "/zlib") then 
-                  Sys.Shell_Execute ("./configure --static"); -- prefix= not working
-                  Sys.Shell_Execute ("make");
-                  Sys.Shell_Execute ("rm -f *.o *.lo");
-                  Fls.Copy_File (GNAT_Dir_Dl & "/zlib/libz.a", GNAT_Dir & "/lib/libz.a");
-                  --  zlib.gpr use system wide zlib by default, see AIDE manual how to link zlib statically
-                  if Fls.Set_Directory (To_String (GNAT_Dir_Dl & "/zlib/contrib/ada")) then
-                     Sys.Shell_Execute ("gprbuild -d -P./zlib.gpr");
-                  end if;
-               end if;
-            end if;
-         end if;
-      else  
-         Log.Msg ("Zlib already installed.");
-      end if;
+      --  --  Ada-Util
+      --  
+      --  if not Fls.Exists (GNAT_Dir & "/lib/utilada_core.static/libutilada_core.a") then
+      --     StCarrez_Adautil_Url := +"https://github.com/stcarrez/ada-util";
+      --     if Fls.Set_Directory (GNAT_Dir_Dl) then
+      --  
+      --        Log.Msg (+"Download Utilada.");
+      --        Sys.Shell_Execute ("git clone " & StCarrez_Adautil_Url);
+      --        Log.Msg (+"Utilada installation.");
+      --  
+      --        Fls.Rename (GNAT_Dir_Dl & "/ada-util", GNAT_Dir_Dl & "/utilada");
+      --        if Fls.Set_Directory (GNAT_Dir_Dl & "/utilada") then
+      --           --  ./configure --enable-aunit --disable-ahven --prefix=/home/sr/opt/gnat-2020
+      --           --  make install prefix=/home/sr/opt/gnat-2020
+      --           Sys.Shell_Execute (+"./configure " &
+      --                              "--enable-aunit --disable-ahven " & -- mutually exclusive
+      --                              "--prefix=" & GNAT_Dir);
+      --           Sys.Shell_Execute ("make");
+      --           --  Shell_Execute ("make test");
+      --           Sys.Shell_Execute ("make install");
+      --           if Fls.Create_Directory_Tree (GNAT_Dir & "/share/doc/utilada") then
+      --              Fls.Copy_File (GNAT_Dir_Dl & "/utilada/docs/utilada-book.pdf", GNAT_Dir & "/share/doc/utilada/utilada.pdf");
+      --           end if;
+      --        end if;
+      --     end if;
+      --  else
+      --     Log.Msg (+"Utilada already installed.");
+      --  end if;
+      --  
+      --  --  Zlib build - https://github.com/madler/zlib -------------------------
+      --  --  Embedding use in ./lib/aws.*, but no external libz.a usuable
+      --  
+      --  if not Fls.Exists (GNAT_Dir & "/lib/libz.a") then
+      --     GaillyAdler_Zlib_Url := +"https://zlib.net/zlib-1.2.11.tar.gz";
+      --     -- GCC linker -L parameter don't accept dots in path
+      --     GaillyAdler_Zlib_File := GNAT_Dir_Dl & "/zlib-1-2-11.tar.gz";
+      --  
+      --     --  Download message is outputted in Fls.Download_File
+      --     if Fls.Download_File (GaillyAdler_Zlib_Url, GaillyAdler_Zlib_File, +"Zlib", 607698) then
+      --        Log.Msg (+"Zlib installation.");
+      --  
+      --        if Fls.Create_Directory_Tree (GNAT_Dir_Dl & "/zlib") then
+      --           Sys.Shell_Execute ("tar xzf " & GaillyAdler_Zlib_File & " --strip-components=1 -C " & GNAT_Dir_Dl & "/zlib");
+      --           if Fls.Set_Directory (GNAT_Dir_Dl & "/zlib") then
+      --              Sys.Shell_Execute ("./configure --static"); -- prefix= not working
+      --              Sys.Shell_Execute ("make");
+      --              Sys.Shell_Execute ("rm -f *.o *.lo");
+      --              Fls.Copy_File (GNAT_Dir_Dl & "/zlib/libz.a", GNAT_Dir & "/lib/libz.a");
+      --              --  zlib.gpr use system wide zlib by default, see AIDE manual how to link zlib statically
+      --              if Fls.Set_Directory (To_String (GNAT_Dir_Dl & "/zlib/contrib/ada")) then
+      --                 Sys.Shell_Execute ("gprbuild -d -P./zlib.gpr");
+      --              end if;
+      --           end if;
+      --        end if;
+      --     end if;
+      --  else
+      --     Log.Msg ("Zlib already installed.");
+      --  end if;
 
       --  Tools ---------------------------------------------------------------
 
@@ -1121,7 +1130,6 @@ begin
                      if Fls.Create_Directory_Tree (GNAT_Dir & "/share/doc/adacontrol") then
                         Fls.Copy_File (GNAT_Dir_Dl & "/adacontrol/doc/adacontrol_pm.pdf",GNAT_Dir & "/share/doc/adacontrol/adacontrol_pm.pdf");
                         Fls.Copy_File (GNAT_Dir_Dl & "/adacontrol/doc/adacontrol_ug.pdf",GNAT_Dir & "/share/doc/adacontrol/adacontrol_ug.pdf");
-                        Fls.Copy_File (GNAT_Dir_Dl & "/adacontrol/doc/ansaldo_ug.pdf",GNAT_Dir & "/share/doc/adacontrol/ansaldo_ug.pdf");
                      end if;
                   end if;
                end if;

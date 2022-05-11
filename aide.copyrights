@@ -3,13 +3,13 @@
 -- ▌▌▄▌▛▌
 -- ▚▘▙▖█▌
 --
--- @file      aide.copyrights
--- @copyright See content below
--- @licence   GPLv3
+-- @file      v20.copyrights
+-- @copyright See authors list and v20.copyrights for index from name initials
+-- @licence   EUPL 1.2
 -- @encoding  UTF-8
 ------------------------------------------------------------------------------
 -- @summary
--- aide library copyrights & credits summary 
+-- V20 library copyrights & credits summary 
 --
 -- @description
 -- 
@@ -25,7 +25,7 @@
 
 Please refer to the document...
 
-sow - AIDE for Debian & Ubuntu Manual.*
+sow - v20 Ada Library User Manual.pdf
 
 ...located in ./doc subdirectory.
 
