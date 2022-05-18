@@ -89,6 +89,14 @@
 --                         alternate Adacore package download when installing 
 --                         as we need some extra files in station packages. 
 --                         Also simplify options set.
+--  20220516 - 2.18 - sr - Better root user check. Check and install packages
+--                         according to system name and version. Check packages
+--                         installed or not a better way. Fix missing 'install
+--                         ok flag file' in server mode. List command does no
+--                         more need target option. Fix bad path removing
+--                         examples and documentations in server mode. It is 
+--                         no longer necessary to restart a new terminal to 
+--                         pursue the installation.
 --
 -------------------------------------------------------------------------------
 
@@ -114,10 +122,10 @@ procedure Aide is
    --  PUBLIC VARIABLES AND CONSTANTS
    ----------------------------------------------------------------------------
 
-   OS_Packages : constant String := "automake, make, curl, git, libtool, " &
-             "tar, xz-utils, libcurl4, libcurl4-openssl-dev, libssl-dev, perl";
-
-   GNAT_Target, GNAT_Year, GNAT_Dir, GNAT_Dir_Dl, AIDE_Action : VString := +"";
+   GNAT_Target, GNAT_Year, GNAT_Dir, GNAT_Dir_Dl, AIDE_Action, OS_Packages : VString := +"";
+   
+   OS_Name_Version : constant VString := Sys.Get_Sys;
+   
    GNAT_Dir_Root : constant VString := +"/opt/gnat-";
 
    Mime_Type : constant VString := +"x-adagpr";
@@ -199,6 +207,7 @@ procedure Aide is
       --  Additional Help.
       procedure Help_Block_2;
       --  Additional Help.
+
    end Srv;
    package body Srv is separate;
 
@@ -216,7 +225,7 @@ begin
 
    --  Main settings
 
-   Prg.Set_Version (2, 17);
+   Prg.Set_Version (2, 18);
    Log.Set_Display(True);
    Log.Set_Debug (False);
    Tio.Cursor_Off;
@@ -239,7 +248,7 @@ begin
                        "0cd3e2a668332613b522d9612ffa27ef3eb0815b?filename=" &
                        "gnat-community-2019-20190517-x86_64-linux-bin";
    GNAT_Download(2019).Install_Size := 516626663;
-   GNAT_Download(2019).Server_Size := 179628304;
+   GNAT_Download(2019).Server_Size := 176805980;
    GNAT_Download(2019).Station_Size := 554126668;
    
    --  2020
@@ -249,7 +258,7 @@ begin
                        "4d99b7b2f212c8efdab2ba8ede474bb9fa15888d?filename=" &
                        "gnat-2020-20200429-x86_64-linux-bin";
    GNAT_Download(2020).Install_Size := 661178129;       
-   GNAT_Download(2020).Server_Size := 190787452;
+   GNAT_Download(2020).Server_Size := 181324440;
    GNAT_Download(2020).Station_Size := 699872000;
 
    --  2021 
@@ -259,8 +268,32 @@ begin
                        "f3a99d283f7b3d07293b2e1d07de00e31e332325?filename=" &
                        "gnat-2021-20210519-x86_64-linux-bin";
    GNAT_Download(2021).Install_Size := 754890671;       
-   GNAT_Download(2021).Server_Size := 202068476;
+   GNAT_Download(2021).Server_Size := 204086328;
    GNAT_Download(2021).Station_Size := 793303568;
+
+   --  System packages to install
+   if (OS_Name_Version = +"Debian GNU/Linux 8") then
+      OS_Packages := +"";
+   elsif (OS_Name_Version = +"Debian GNU/Linux 9") then
+      OS_Packages := +"automake, make, curl, git, libtool, " &
+        "tar, xz-utils, perl";
+   else
+      OS_Packages := +"automake, make, curl, git, libtool, " &
+        "tar, xz-utils, perl";
+   end if;
+   
+   --Log.Msg ("System: " & OS_Name_Version);
+   --Log.Msg ("Packages: " & OS_Packages);
+
+   --  if (OS_Name_Version = +"Debian GNU/Linux 8") then
+   --     OS_Packages := +"";
+   --  elsif (OS_Name_Version = +"Debian GNU/Linux 9") then
+   --     OS_Packages := +"automake, make, curl, git, libtool, " &
+   --       "tar, xz-utils, libcurl3, libcurl3-gnutls, perl";
+   --  else
+   --     OS_Packages := +"automake, make, curl, git, libtool, " &
+   --       "tar, xz-utils, libcurl4, libcurl4-openssl-dev, libssl-dev, perl";
+   --  end if;
 
    --  Command line processing ------------------------------------------------
 
@@ -352,6 +385,11 @@ begin
          Arg_Not_Valid := True;
       end if;
 
+      if Empty (OS_Packages) then
+         Log.Err ("System: " & OS_Name_Version & " too old");
+         Arg_Not_Valid := True;
+      end if;
+
       Log.Dbg ("AIDE_Action: " & AIDE_Action);
 
       --  Switch processing
@@ -377,25 +415,25 @@ begin
       end if;
       Log.Dbg ("Switch -y: " & GNAT_Year);
 
-      --  if Gcl_Install.all = "" then
-         GNAT_Dir := Sys.Get_Home & GNAT_Dir_Root & GNAT_Year;
-      --  else
-      --     GNAT_Dir :=
-      --        Sys.Get_Home & "/" & Trim_Slashes (To_VString (Gcl_Install.all));
-      --  end if;
-      Log.Dbg ("Switch -i: " & GNAT_Dir);
+      GNAT_Dir := Sys.Get_Home & GNAT_Dir_Root & GNAT_Year;
       
       --  if Gcl_Check then   ----------------------------------------------/\-----
       --     Raise_Exception; --  < Crash program to test .err trace       /!!\
       --  end if;             --------------------------------------------/-!!-\---
 
       -- Check graphic station or text mode server (to avoid MIME RTE)
-      if (not Fls.Exists (+"/usr/share/xsessions")) and (GNAT_Target = +"station") then
-         Log.Msg (+"Error: Can't install a station setup on a server target.");
-         Log.Line;
-         Arg_Not_Valid := True;
+      
+      if Arg_Count = 1 then
+         if (not Fls.Exists (+"/usr/share/xsessions")) and 
+           (GNAT_Target = +"station") and 
+           (not (Arg_Table (Arg_Count) = List_Action) ) then
+            Log.Msg (+"Error: Can't perform a default station operation on a server target.");
+            Log.Msg (+"Please specify server target with '-t server' option.");
+            Log.Line;
+            Arg_Not_Valid := True;
+         end if;
       end if;
-
+      
       GNAT_Dir_Dl := GNAT_Dir & "-downloads";
 
       if Arg_Not_Valid then
@@ -450,6 +488,7 @@ begin
                         if Srv.Install_GNAT_Path (GNAT_Dir) then
                            Srv.Install_Registering (GNAT_Year);
                            Srv.Install_Libraries (GNAT_Year);
+                           Srv.Help_Block_2;
                         end if;
                      end if;
                   end if;

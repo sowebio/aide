@@ -124,7 +124,7 @@ separate (Aide) package body Srv is
             Log.Err ("Install_Registering - Can't create: " & Sys.Get_Home & "/.local/share/applications"); 
          end if;
       else
-         Log.Msg (+"GPS launcher already created.");  
+         Log.Msg (+"GnatStudio launcher already created.");  
       end if;
       
       --  Check_File_Name        : /home/sr/check.gpr
@@ -370,6 +370,8 @@ separate (Aide) package body Srv is
       --Bashrc_Path_Unset : Boolean := True;
       Env_Path_Set : Boolean := False;
       --LF : constant VString := To_VString (Character'Val (10));
+      Env_Path_Sys : VString := Sys.Get_Env ("PATH");
+
    begin
 
       if not Fls.Exists (Dir_Install) then
@@ -395,46 +397,51 @@ separate (Aide) package body Srv is
 
             Tio.Close (Bashrc_Handle);
             
-            --  Delete all previous PATH
+            --  Delete all previous PATH in .bashrc FILE
             for I in 2019 .. 2021 loop
                Fls.Delete_Lines (Bashrc_File, To_String (Sys.Get_Home & GNAT_Dir_Root & To_VString (I) & "/bin:$PATH"));
             end loop;
 
-            --  Set new permanent PATH
-            --if Bashrc_Path_Unset then
-               Tio.Append (Bashrc_Handle, Bashrc_File);
-               if Tio.Is_Open (Bashrc_Handle) then
-                  -- A first LF is mandatory to circumvent the vicious case of
-                  -- a last file line which is a commented one and not ending
-                  -- by a LF (new line) character thus the string is inserted
-                  -- at the end of the commented line instead but wrote on a
-                  -- new line !
-                  Tio.Put_Line (Bashrc_Handle, LF & "export PATH=" 
-                                                  & Dir_Install 
-                                                  & "/bin:$PATH");
-                  Tio.Close (Bashrc_Handle);
-                  Log.Msg ("GNAT path " & Dir_Install & " set in " & Bashrc_File);
-               else
-                  Log.Err ("Srv.Install_GNAT_Path - Can't append " & Bashrc_File);
-               end if;
-            --end if;
-
+            --  Set new permanent PATH in .bashrc FILE
+            Tio.Append (Bashrc_Handle, Bashrc_File);
+            if Tio.Is_Open (Bashrc_Handle) then
+               -- A first LF is mandatory to circumvent the vicious case of
+               -- a last file line which is a commented one and not ending
+               -- by a LF (new line) character thus the string is inserted
+               -- at the end of the commented line instead but wrote on a
+               -- new line !
+               Tio.Put_Line (Bashrc_Handle, LF & "export PATH=" 
+                             & Dir_Install 
+                             & "/bin:$PATH");
+               Tio.Close (Bashrc_Handle);
+               Log.Msg ("GNAT path " & Dir_Install & " set in " & Bashrc_File);
+            else
+               Log.Err ("Srv.Install_GNAT_Path - Can't append " & Bashrc_File);
+            end if;
+            
+            
+            Log.Msg ("System path before: " & Env_Path_Sys);
+            --  Delete all previous PATH in environment variable PATH
+            for I in 2019 .. 2021 loop
+               Env_Path_Sys := Replace_Pattern (Env_Path_Sys, Sys.Get_Home & GNAT_Dir_Root & To_VString (I) & "/bin:", +"");
+            end loop;
+            
+            -- Set new permanent PATH in environment variable PATH
+            Sys.Set_Env ("PATH", Dir_Install & "/bin:" & Env_Path_Sys);
+            Log.Msg ("System path after: " & Sys.Get_Env ("PATH"));      
+  
             --  Exit for current session when no PATH still set
             if Index (Sys.Get_Env ("PATH"), Dir_Install) = 0 then
                Srv.Help_Block_2;
-               ---Log.Msg ("--------------------------------------------------");
-               ---Log.Msg ("Launch a new terminal or execute the line below.");
-               ---Log.Msg ("export PATH=" & Dir_Install & "/bin:$PATH");
                if AIDE_Action = Install_Action then
                   Log.Msg ("Run again AIDE to resume and finish the installation.");
                end if;   
-               ---Log.Msg ("/!\ Not follow this advice could rising problems.");
                Log.Msg ("--------------------------------------------------");
             else
-               Log.Msg ("GNAT path " & Dir_Install & " already in PATH");
-               Log.Msg ("GNAT path OK, no need to start a new console");
+               Log.Msg ("GNAT path " & Dir_Install & " checked");
                Env_Path_Set := True;
             end if;
+            
          else
             Log.Err ("Srv.Install_GNAT_Path - Can't open " & Bashrc_File);
          end if;
@@ -717,18 +724,22 @@ begin
                else
                   if Install_GNAT_Debug_RTS (Year_Install) then
                      Log.Msg ("GNAT debug ready RTS done.");
-            
-                     Tio.Create (GNAT_Handle, GNAT_Dir & "/" & AIDE_Install_Ok_File);
-                     Tio.Close (GNAT_Handle);
-                     if Fls.Exists (GNAT_Dir & "/" & AIDE_Install_Ok_File) then
-                        Log.Msg ("GNAT install complete.");
-                        Result := True;
-                     else
-                        Log.Err ("GNAT install not successfull.");
-                     end if;
+                     Result := True;
                   else
                      Log.Err ("Srv.Install_GNAT - Can't install GNAT debug ready RTS.");
                   end if;
+               end if;
+            end if;
+            
+            -- Install flag file
+            if Result then
+               Tio.Create (GNAT_Handle, GNAT_Dir & "/" & AIDE_Install_Ok_File);
+               Tio.Close (GNAT_Handle);
+               if Fls.Exists (GNAT_Dir & "/" & AIDE_Install_Ok_File) then
+                  Log.Msg ("GNAT install complete.");
+               else
+                  Result := False;
+                  Log.Err ("Srv.Install_GNAT - Can't create successful install flag file.");
                end if;
             end if;
             
@@ -1170,8 +1181,8 @@ begin
             Log.Msg (GNAT_Dir & "/share/doc" & " removed");
          end if;
       
-         if Fls.Delete_Directory_Tree (GNAT_Dir & "share/examples") then
-            Log.Msg (GNAT_Dir & "share/examples" & " removed");
+         if Fls.Delete_Directory_Tree (GNAT_Dir & "/share/examples") then
+            Log.Msg (GNAT_Dir & "/share/examples" & " removed");
          end if;
       
          if Fls.Delete_Directory_Tree (GNAT_Dir_Dl) then
@@ -1246,10 +1257,8 @@ begin
    procedure Help_Block_2 is
    begin
       Log.Msg ("--------------------------------------------------");
-      Log.Msg ("To taking account of the PATH update:");
-      Log.Msg ("- Close all terminals, including this one");
-      Log.Msg ("- Run a fresh terminal with the updated PATH inside");
-      Log.Msg ("/!\ Not follow this advice could rising problems.");
+      Log.Msg ("To taking account of the PATH update, type:");
+      Log.Msg ("source ~/.bashrc or run a fresh terminal");
       Log.Msg ("--------------------------------------------------");
    end Help_Block_2;
    
