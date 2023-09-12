@@ -1,7 +1,5 @@
 # AIDE for Debian & Ubuntu
 
-**AIDE is now deprecated by ADEL**
-
 ## Introduction
 
 **AIDE**, Ada Instant Development Environment, make **Ada integrated development environment setup a breeze**. See aide-doc repository for further informations.
